@@ -3,6 +3,7 @@
  *
  * Highlights any character outside the ASCII range (0x00-0x7F)
  * Works in both Edit Mode (Live Preview) and Reading View.
+ * Supports an allowlist of characters to exclude from highlighting.
  */
 
 const { Plugin, PluginSettingTab, Setting } = require("obsidian");
@@ -11,49 +12,143 @@ const { StateField, StateEffect } = require("@codemirror/state");
 
 const DEFAULT_SETTINGS = {
 	enabled: true,
+	allowedChars: "",
 };
 
-// ── State effect to toggle highlighting on/off ────────────────
+// ── Helpers ───────────────────────────────────────────────────
+
+function escapeRegex(str) {
+	return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+// Build a regex that matches non-ASCII characters NOT in the allowlist.
+// We match any run of non-ASCII chars, then filter in a replacer.
+function buildAllowedSet(allowedChars) {
+	const set = new Set();
+	// Use Array.from to properly split multi-byte chars and emojis
+	for (const ch of Array.from(allowedChars)) {
+		if (ch.trim() === "" && ch !== "\u00A0") continue; // skip regular spaces but keep nbsp
+		set.add(ch);
+	}
+	return set;
+}
+
+function isAllowed(char, allowedSet) {
+	// Check the character itself and also surrogate pairs / ZWJ sequences
+	return allowedSet.has(char);
+}
+
+// ── State effects ─────────────────────────────────────────────
 
 const toggleHighlight = StateEffect.define();
+const updateAllowlist = StateEffect.define();
 
 // ── Edit Mode (CodeMirror 6) ──────────────────────────────────
 
 function buildEditorExtension(plugin) {
-	const enabledField = StateField.define({
+	const settingsField = StateField.define({
 		create() {
-			return plugin.settings.enabled;
+			return {
+				enabled: plugin.settings.enabled,
+				allowedSet: buildAllowedSet(plugin.settings.allowedChars),
+			};
 		},
 		update(value, tr) {
+			let updated = value;
 			for (const e of tr.effects) {
-				if (e.is(toggleHighlight)) return e.value;
+				if (e.is(toggleHighlight)) {
+					updated = { ...updated, enabled: e.value };
+				}
+				if (e.is(updateAllowlist)) {
+					updated = {
+						...updated,
+						allowedSet: buildAllowedSet(e.value),
+					};
+				}
 			}
-			return value;
+			return updated;
 		},
-	});
-
-	const nonAsciiMatcher = new MatchDecorator({
-		regexp: /[^\x00-\x7F]+/g,
-		decoration: Decoration.mark({ class: "non-ascii-highlight" }),
 	});
 
 	const highlightPlugin = ViewPlugin.fromClass(
 		class {
 			constructor(view) {
-				this.decorations = view.state.field(enabledField)
-					? nonAsciiMatcher.createDeco(view)
-					: Decoration.none;
+				this.view = view;
+				this.decorations = this.buildDecorations(view);
 			}
+
 			update(update) {
-				const enabled = update.state.field(enabledField);
-				if (!enabled) {
-					this.decorations = Decoration.none;
-					return;
+				if (
+					update.docChanged ||
+					update.viewportChanged ||
+					update.transactions.some((tr) =>
+						tr.effects.some(
+							(e) =>
+								e.is(toggleHighlight) || e.is(updateAllowlist),
+						),
+					)
+				) {
+					this.decorations = this.buildDecorations(update.view);
 				}
-				this.decorations = nonAsciiMatcher.updateDeco(
-					update,
-					this.decorations,
-				);
+			}
+
+			buildDecorations(view) {
+				const { enabled, allowedSet } = view.state.field(settingsField);
+				if (!enabled) return Decoration.none;
+
+				const builder =
+					new (require("@codemirror/state").RangeSetBuilder)();
+				const doc = view.state.doc;
+
+				for (const { from, to } of view.visibleRanges) {
+					const text = doc.sliceString(from, to);
+					// Walk through the string character by character using iterator
+					let i = 0;
+					const chars = Array.from(text);
+					let pos = from;
+
+					for (const ch of chars) {
+						const charLen = ch.length; // UTF-16 length (2 for surrogate pairs)
+						const code = ch.codePointAt(0);
+
+						if (code > 0x7f && !allowedSet.has(ch)) {
+							// Find runs of consecutive non-ascii non-allowed chars
+							let runEnd = pos + charLen;
+							// peek ahead
+							const remaining = Array.from(
+								text.slice(i + charLen),
+							);
+							for (const nextCh of remaining) {
+								const nextCode = nextCh.codePointAt(0);
+								if (
+									nextCode > 0x7f &&
+									!allowedSet.has(nextCh)
+								) {
+									runEnd += nextCh.length;
+								} else {
+									break;
+								}
+							}
+							builder.add(
+								pos,
+								runEnd,
+								Decoration.mark({
+									class: "non-ascii-highlight",
+								}),
+							);
+							// Skip ahead past the run
+							const skipped = text.slice(i, i + (runEnd - pos));
+							i += runEnd - pos;
+							pos = runEnd;
+							continue;
+						}
+
+						i += charLen;
+						pos += charLen;
+					}
+				}
+
+				return builder.finish();
 			}
 		},
 		{
@@ -61,12 +156,12 @@ function buildEditorExtension(plugin) {
 		},
 	);
 
-	return [enabledField, highlightPlugin];
+	return [settingsField, highlightPlugin];
 }
 
 // ── Reading View (Post Processor) ─────────────────────────────
 
-function highlightNonAsciiInReading(el) {
+function highlightNonAsciiInReading(el, allowedSet) {
 	const nodes = [];
 	const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
 
@@ -78,12 +173,52 @@ function highlightNonAsciiInReading(el) {
 
 	nodes.forEach((node) => {
 		const wrapper = document.createElement("span");
-		wrapper.innerHTML = node.textContent.replace(
-			/[^\x00-\x7F]+/g,
-			(match) => `<span class="non-ascii-highlight">${match}</span>`,
-		);
+		// Process character by character to respect allowlist
+		let html = "";
+		let inHighlight = false;
+		let buffer = "";
+
+		for (const ch of Array.from(node.textContent)) {
+			const code = ch.codePointAt(0);
+			const shouldHighlight = code > 0x7f && !allowedSet.has(ch);
+
+			if (shouldHighlight) {
+				if (!inHighlight) {
+					// Flush normal buffer
+					html += escapeHtml(buffer);
+					buffer = "";
+					inHighlight = true;
+				}
+				buffer += ch;
+			} else {
+				if (inHighlight) {
+					// Flush highlight buffer
+					html += `<span class="non-ascii-highlight">${escapeHtml(buffer)}</span>`;
+					buffer = "";
+					inHighlight = false;
+				}
+				buffer += ch;
+			}
+		}
+
+		// Flush remaining
+		if (inHighlight) {
+			html += `<span class="non-ascii-highlight">${escapeHtml(buffer)}</span>`;
+		} else {
+			html += escapeHtml(buffer);
+		}
+
+		wrapper.innerHTML = html;
 		node.parentNode.replaceChild(wrapper, node);
 	});
+}
+
+function escapeHtml(str) {
+	return str
+		.replace(/&/g, "&amp;")
+		.replace(/</g, "&lt;")
+		.replace(/>/g, "&gt;")
+		.replace(/"/g, "&quot;");
 }
 
 // ── Settings Tab ──────────────────────────────────────────────
@@ -112,6 +247,26 @@ class HighlightNonAsciiSettingTab extends PluginSettingTab {
 						this.plugin.refreshAllEditors();
 					}),
 			);
+
+		new Setting(containerEl)
+			.setName("Allowed characters")
+			.setDesc(
+				"Paste characters or emojis here that should NOT be highlighted. " +
+					"Just paste them next to each other, no separators needed. " +
+					"Example: é—ñ🔥✅",
+			)
+			.addTextArea((text) => {
+				text.setPlaceholder("e.g. é—ñ🔥✅")
+					.setValue(this.plugin.settings.allowedChars)
+					.onChange(async (value) => {
+						this.plugin.settings.allowedChars = value;
+						await this.plugin.saveSettings();
+						this.plugin.refreshAllEditors();
+					});
+				text.inputEl.rows = 3;
+				text.inputEl.cols = 40;
+				text.inputEl.style.fontFamily = "monospace";
+			});
 	}
 }
 
@@ -128,7 +283,8 @@ module.exports = class HighlightNonAsciiPlugin extends Plugin {
 		// Reading view post processor
 		this.registerMarkdownPostProcessor((el) => {
 			if (this.settings.enabled) {
-				highlightNonAsciiInReading(el);
+				const allowedSet = buildAllowedSet(this.settings.allowedChars);
+				highlightNonAsciiInReading(el, allowedSet);
 			}
 		});
 
@@ -166,12 +322,17 @@ module.exports = class HighlightNonAsciiPlugin extends Plugin {
 	}
 
 	refreshAllEditors() {
-		// Push the toggle effect to all open editor views
+		const allowedSet = buildAllowedSet(this.settings.allowedChars);
+
+		// Push effects to all open editor views
 		this.app.workspace.iterateAllLeaves((leaf) => {
 			const view = leaf.view;
 			if (view.editor && view.editor.cm) {
 				view.editor.cm.dispatch({
-					effects: toggleHighlight.of(this.settings.enabled),
+					effects: [
+						toggleHighlight.of(this.settings.enabled),
+						updateAllowlist.of(this.settings.allowedChars),
+					],
 				});
 			}
 		});
