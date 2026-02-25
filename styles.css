@@ -1,0 +1,6 @@
+.non-ascii-highlight {
+	background-color: rgba(255, 60, 60, 1);
+	padding: 1px;
+	border: 1px solid rgb(255, 255, 255);
+	border-radius: 2px;
+}
