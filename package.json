@@ -1,0 +1,29 @@
+{
+	"name": "obsidian-highlight-non-ascii",
+	"version": "1.0.0",
+	"description": "Highlights non-ASCII characters in your notes with a configurable allowlist.",
+	"main": "main.js",
+	"type": "module",
+	"scripts": {
+		"dev": "node esbuild.config.mjs",
+		"build": "tsc -noEmit -skipLibCheck && node esbuild.config.mjs production",
+		"version": "node version-bump.mjs && git add manifest.json versions.json"
+	},
+	"keywords": [
+		"obsidian",
+		"plugin",
+		"highlight",
+		"non-ascii",
+		"unicode"
+	],
+	"license": "MIT",
+	"devDependencies": {
+		"@types/node": "^16.11.6",
+		"esbuild": "0.25.5",
+		"tslib": "2.4.0",
+		"typescript": "^5.8.3"
+	},
+	"dependencies": {
+		"obsidian": "latest"
+	}
+}
