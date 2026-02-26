@@ -4,6 +4,7 @@ import {
 	Setting,
 	App,
 	MarkdownView,
+	TFile,
 } from "obsidian";
 import {
 	ViewPlugin,
@@ -68,8 +69,11 @@ function escapeHtml(str: string): string {
 // State effects (for dispatching setting changes to CM6)
 // ---------------------------------------------------------------------------
 
+const FRONTMATTER_KEY = "highlight-non-ascii";
+
 const toggleHighlight = StateEffect.define<boolean>();
 const updateAllowlist = StateEffect.define<string>();
+const updateFrontmatterDisabled = StateEffect.define<boolean>();
 
 // ---------------------------------------------------------------------------
 // Edit Mode (CodeMirror 6 extension)
@@ -78,6 +82,7 @@ const updateAllowlist = StateEffect.define<string>();
 interface SettingsFieldValue {
 	enabled: boolean;
 	allowedSet: Set<string>;
+	frontmatterDisabled: boolean;
 }
 
 function buildEditorExtension(plugin: HighlightNonAsciiPlugin): Extension {
@@ -86,6 +91,7 @@ function buildEditorExtension(plugin: HighlightNonAsciiPlugin): Extension {
 			return {
 				enabled: plugin.settings.enabled,
 				allowedSet: buildAllowedSet(plugin.settings.allowedChars),
+				frontmatterDisabled: plugin.isActiveFileDisabledByFrontmatter(),
 			};
 		},
 		update(value: SettingsFieldValue, tr): SettingsFieldValue {
@@ -99,6 +105,9 @@ function buildEditorExtension(plugin: HighlightNonAsciiPlugin): Extension {
 						...updated,
 						allowedSet: buildAllowedSet(e.value),
 					};
+				}
+				if (e.is(updateFrontmatterDisabled)) {
+					updated = { ...updated, frontmatterDisabled: e.value };
 				}
 			}
 			return updated;
@@ -121,7 +130,8 @@ function buildEditorExtension(plugin: HighlightNonAsciiPlugin): Extension {
 						tr.effects.some(
 							(e) =>
 								e.is(toggleHighlight) ||
-								e.is(updateAllowlist),
+								e.is(updateAllowlist) ||
+								e.is(updateFrontmatterDisabled),
 						),
 					)
 				) {
@@ -130,9 +140,9 @@ function buildEditorExtension(plugin: HighlightNonAsciiPlugin): Extension {
 			}
 
 			buildDecorations(view: EditorView): DecorationSet {
-				const { enabled, allowedSet } =
+				const { enabled, allowedSet, frontmatterDisabled } =
 					view.state.field(settingsField);
-				if (!enabled) return Decoration.none;
+				if (!enabled || frontmatterDisabled) return Decoration.none;
 
 				const builder = new RangeSetBuilder<Decoration>();
 				const doc = view.state.doc;
@@ -283,6 +293,22 @@ class HighlightNonAsciiSettingTab extends PluginSettingTab {
 			cls: "setting-item-description",
 		});
 
+		const frontmatterHint = containerEl.createDiv("hna-frontmatter-hint");
+		frontmatterHint.createEl("h3", { text: "Per-note control" });
+		frontmatterHint.createEl("p", {
+			text: "You can disable highlighting for a specific note by adding "
+				+ "the following to its frontmatter:",
+		});
+		const codeBlock = frontmatterHint.createEl("pre");
+		codeBlock.createEl("code", {
+			text: "---\nhighlight-non-ascii: false\n---",
+		});
+		frontmatterHint.createEl("p", {
+			text: "If the property is missing or set to true, highlighting "
+				+ "remains active (as long as the global toggle above is enabled).",
+			cls: "setting-item-description",
+		});
+
 		new Setting(containerEl)
 			.setName("Enable highlighting")
 			.setDesc(
@@ -366,13 +392,16 @@ export default class HighlightNonAsciiPlugin extends Plugin {
 		this.registerEditorExtension(this.editorExtension);
 
 		// Reading view post processor
-		this.registerMarkdownPostProcessor((el) => {
-			if (this.settings.enabled) {
-				const allowedSet = buildAllowedSet(
-					this.settings.allowedChars,
-				);
-				highlightNonAsciiInReading(el, allowedSet);
+		this.registerMarkdownPostProcessor((el, ctx) => {
+			if (!this.settings.enabled) return;
+			if (ctx.sourcePath) {
+				const file = this.app.vault.getAbstractFileByPath(ctx.sourcePath);
+				if (file instanceof TFile && this.isFileDisabledByFrontmatter(file)) {
+					return;
+				}
 			}
+			const allowedSet = buildAllowedSet(this.settings.allowedChars);
+			highlightNonAsciiInReading(el, allowedSet);
 		});
 
 		// Settings tab
@@ -389,6 +418,47 @@ export default class HighlightNonAsciiPlugin extends Plugin {
 				await this.saveSettings();
 				this.refreshAllEditors();
 			},
+		});
+
+		// Re-check frontmatter when metadata changes
+		this.registerEvent(
+			this.app.metadataCache.on("changed", () => {
+				this.dispatchFrontmatterUpdate();
+			}),
+		);
+
+		// Re-check frontmatter when switching files
+		this.registerEvent(
+			this.app.workspace.on("active-leaf-change", () => {
+				this.dispatchFrontmatterUpdate();
+			}),
+		);
+	}
+
+	isFileDisabledByFrontmatter(file: TFile): boolean {
+		const cache = this.app.metadataCache.getFileCache(file);
+		const value = cache?.frontmatter?.[FRONTMATTER_KEY];
+		return value === false || value === "false";
+	}
+
+	isActiveFileDisabledByFrontmatter(): boolean {
+		const view = this.app.workspace.getActiveViewOfType(MarkdownView);
+		if (!view?.file) return false;
+		return this.isFileDisabledByFrontmatter(view.file);
+	}
+
+	private dispatchFrontmatterUpdate(): void {
+		const disabled = this.isActiveFileDisabledByFrontmatter();
+		this.app.workspace.iterateAllLeaves((leaf) => {
+			const view = leaf.view as MarkdownView;
+			if (
+				view?.editor &&
+				(view.editor as any).cm instanceof EditorView
+			) {
+				(view.editor as any).cm.dispatch({
+					effects: [updateFrontmatterDisabled.of(disabled)],
+				});
+			}
 		});
 	}
 

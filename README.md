@@ -9,6 +9,8 @@ Useful for catching invisible Unicode characters, accidental special characters,
 - Highlights non-ASCII characters with a visible red background
 - Works in both Edit Mode (Live Preview) and Reading View
 - Configurable allowlist to exclude specific characters (accented letters, emojis, etc.)
+- Per-note control via frontmatter
+- Customizable highlight CSS
 - Toggle on/off from settings or the command palette
 
 ## Usage
@@ -18,7 +20,20 @@ Useful for catching invisible Unicode characters, accidental special characters,
 3. Use **Settings > Highlight Non-ASCII** to configure:
     - **Enable highlighting** -- toggle the feature on or off
     - **Allowed characters** -- paste characters that should NOT be highlighted (e.g. accented letters, specific emojis)
+    - **Custom CSS** -- edit the highlight style directly
 4. Use the command palette: **Toggle non-ASCII highlighting** to quickly enable/disable.
+
+## Disabling for specific notes
+
+Add the following frontmatter to any note where you want to turn off highlighting:
+
+```yaml
+---
+highlight-non-ascii: false
+---
+```
+
+If the property is missing or set to `true`, highlighting remains active (as long as the global toggle is enabled).
 
 ## Installation
 

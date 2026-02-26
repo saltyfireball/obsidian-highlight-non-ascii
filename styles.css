@@ -5,7 +5,27 @@
 	border-radius: 2px;
 }
 
-/* Settings page */
+/* Settings page -- frontmatter hint */
+
+.hna-frontmatter-hint {
+	margin-bottom: 1em;
+	padding: 12px 16px;
+	background: var(--background-secondary);
+	border-radius: 10px;
+}
+
+.hna-frontmatter-hint h3 {
+	margin-top: 0;
+}
+
+.hna-frontmatter-hint pre {
+	padding: 8px 12px;
+	border-radius: 6px;
+	background: var(--background-primary);
+	font-size: 0.85em;
+}
+
+/* Settings page -- CSS editor */
 
 .hna-css-editor {
 	margin-top: 4px;
