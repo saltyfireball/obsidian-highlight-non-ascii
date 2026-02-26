@@ -16,13 +16,15 @@ Useful for catching invisible Unicode characters, accidental special characters,
 1. Install and enable the plugin.
 2. Non-ASCII characters will be highlighted automatically.
 3. Use **Settings > Highlight Non-ASCII** to configure:
-   - **Enable highlighting** -- toggle the feature on or off
-   - **Allowed characters** -- paste characters that should NOT be highlighted (e.g. accented letters, specific emojis)
+    - **Enable highlighting** -- toggle the feature on or off
+    - **Allowed characters** -- paste characters that should NOT be highlighted (e.g. accented letters, specific emojis)
 4. Use the command palette: **Toggle non-ASCII highlighting** to quickly enable/disable.
 
 ## Installation
 
 ### From Obsidian Community Plugins
+
+**Might not be approved yet**
 
 1. Open **Settings > Community Plugins > Browse**
 2. Search for "Highlight Non-ASCII"
@@ -30,7 +32,7 @@ Useful for catching invisible Unicode characters, accidental special characters,
 
 ### Manual Installation
 
-1. Download `main.js`, `manifest.json`, and `styles.css` from the latest release.
+1. Download `main.js`, `manifest.json`, and `styles.css` from the [latest release](../../releases/latest)
 2. Create a folder: `<vault>/.obsidian/plugins/highlight-non-ascii/`
 3. Copy the downloaded files into that folder.
 4. Restart Obsidian and enable the plugin in **Settings > Community Plugins**.

@@ -26,11 +26,13 @@ import {
 interface HighlightNonAsciiSettings {
 	enabled: boolean;
 	allowedChars: string;
+	customCSS: string;
 }
 
 const DEFAULT_SETTINGS: HighlightNonAsciiSettings = {
 	enabled: true,
 	allowedChars: "",
+	customCSS: "",
 };
 
 // ---------------------------------------------------------------------------
@@ -307,6 +309,36 @@ class HighlightNonAsciiSettingTab extends PluginSettingTab {
 				text.inputEl.cols = 40;
 				text.inputEl.style.fontFamily = "monospace";
 			});
+
+		new Setting(containerEl)
+			.setName("Custom CSS")
+			.setDesc(
+				"Override the default highlight style. "
+					+ "Use the .non-ascii-highlight selector to customize "
+					+ "background-color, border, padding, border-radius, etc.",
+			);
+
+		const cssContainer = containerEl.createDiv("hna-css-editor");
+
+		const cssTextarea = cssContainer.createEl("textarea", {
+			cls: "hna-css-textarea",
+		});
+		cssTextarea.value = this.plugin.settings.customCSS || "";
+		cssTextarea.placeholder =
+			".non-ascii-highlight {\n"
+			+ "  background-color: rgba(255, 60, 60, 1);\n"
+			+ "  padding: 1px;\n"
+			+ "  border: 1px solid rgb(255, 255, 255);\n"
+			+ "  border-radius: 2px;\n"
+			+ "}";
+		cssTextarea.rows = 8;
+		cssTextarea.spellcheck = false;
+
+		cssTextarea.addEventListener("change", async () => {
+			this.plugin.settings.customCSS = cssTextarea.value;
+			await this.plugin.saveSettings();
+			this.plugin.updateCustomCSS();
+		});
 	}
 }
 
@@ -317,9 +349,16 @@ class HighlightNonAsciiSettingTab extends PluginSettingTab {
 export default class HighlightNonAsciiPlugin extends Plugin {
 	settings!: HighlightNonAsciiSettings;
 	private editorExtension!: Extension;
+	private customStyleEl: HTMLStyleElement | null = null;
 
 	async onload(): Promise<void> {
 		await this.loadSettings();
+
+		// Inject custom CSS override element
+		this.customStyleEl = document.createElement("style");
+		this.customStyleEl.id = "highlight-non-ascii-custom-css";
+		document.head.appendChild(this.customStyleEl);
+		this.updateCustomCSS();
 
 		// Editor extension for Edit / Live Preview
 		this.editorExtension = buildEditorExtension(this);
@@ -350,6 +389,19 @@ export default class HighlightNonAsciiPlugin extends Plugin {
 				this.refreshAllEditors();
 			},
 		});
+	}
+
+	onunload(): void {
+		if (this.customStyleEl) {
+			this.customStyleEl.remove();
+			this.customStyleEl = null;
+		}
+	}
+
+	updateCustomCSS(): void {
+		if (this.customStyleEl) {
+			this.customStyleEl.textContent = this.settings.customCSS || "";
+		}
 	}
 
 	async loadSettings(): Promise<void> {
