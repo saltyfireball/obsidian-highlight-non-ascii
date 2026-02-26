@@ -29,10 +29,18 @@ interface HighlightNonAsciiSettings {
 	customCSS: string;
 }
 
+const DEFAULT_CSS =
+	".non-ascii-highlight {\n"
+	+ "  background-color: rgba(255, 60, 60, 1);\n"
+	+ "  padding: 1px;\n"
+	+ "  border: 1px solid rgb(255, 255, 255);\n"
+	+ "  border-radius: 2px;\n"
+	+ "}";
+
 const DEFAULT_SETTINGS: HighlightNonAsciiSettings = {
 	enabled: true,
 	allowedChars: "",
-	customCSS: "",
+	customCSS: DEFAULT_CSS,
 };
 
 // ---------------------------------------------------------------------------
@@ -323,14 +331,7 @@ class HighlightNonAsciiSettingTab extends PluginSettingTab {
 		const cssTextarea = cssContainer.createEl("textarea", {
 			cls: "hna-css-textarea",
 		});
-		cssTextarea.value = this.plugin.settings.customCSS || "";
-		cssTextarea.placeholder =
-			".non-ascii-highlight {\n"
-			+ "  background-color: rgba(255, 60, 60, 1);\n"
-			+ "  padding: 1px;\n"
-			+ "  border: 1px solid rgb(255, 255, 255);\n"
-			+ "  border-radius: 2px;\n"
-			+ "}";
+		cssTextarea.value = this.plugin.settings.customCSS || DEFAULT_CSS;
 		cssTextarea.rows = 8;
 		cssTextarea.spellcheck = false;
 
