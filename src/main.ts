@@ -299,9 +299,19 @@ class HighlightNonAsciiSettingTab extends PluginSettingTab {
 			text: "You can disable highlighting for a specific note by adding "
 				+ "the following to its frontmatter:",
 		});
-		const codeBlock = frontmatterHint.createEl("pre");
-		codeBlock.createEl("code", {
-			text: "---\nhighlight-non-ascii: false\n---",
+		const snippetText = "---\nhighlight-non-ascii: false\n---";
+		const codeWrapper = frontmatterHint.createDiv("hna-code-wrapper");
+		const codeBlock = codeWrapper.createEl("pre");
+		codeBlock.createEl("code", { text: snippetText });
+		const copyBtn = codeWrapper.createEl("button", {
+			text: "Copy",
+			cls: "hna-copy-btn",
+			attr: { type: "button", "aria-label": "Copy to clipboard" },
+		});
+		copyBtn.addEventListener("click", () => {
+			navigator.clipboard.writeText(snippetText);
+			copyBtn.textContent = "Copied!";
+			setTimeout(() => { copyBtn.textContent = "Copy"; }, 1500);
 		});
 		frontmatterHint.createEl("p", {
 			text: "If the property is missing or set to true, highlighting "
