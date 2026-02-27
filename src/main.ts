@@ -6,6 +6,8 @@ import {
 	MarkdownView,
 	TFile,
 } from "obsidian";
+// codemirror packages are provided by Obsidian at runtime
+// eslint-disable-next-line import/no-extraneous-dependencies
 import {
 	ViewPlugin,
 	Decoration,
@@ -13,12 +15,14 @@ import {
 	EditorView,
 	ViewUpdate,
 } from "@codemirror/view";
+// eslint-disable-next-line import/no-extraneous-dependencies
 import {
 	StateField,
 	StateEffect,
 	RangeSetBuilder,
 	Extension,
 } from "@codemirror/state";
+import type { ObsidianEditor, ObsidianPreviewMode } from "./global.d";
 
 // ---------------------------------------------------------------------------
 // Settings
@@ -55,14 +59,6 @@ function buildAllowedSet(allowedChars: string): Set<string> {
 		set.add(ch);
 	}
 	return set;
-}
-
-function escapeHtml(str: string): string {
-	return str
-		.replace(/&/g, "&amp;")
-		.replace(/</g, "&lt;")
-		.replace(/>/g, "&gt;")
-		.replace(/"/g, "&quot;");
 }
 
 // ---------------------------------------------------------------------------
@@ -221,6 +217,7 @@ function highlightNonAsciiInReading(
 		const textNode = walker.currentNode as Text;
 		if (
 			textNode.textContent &&
+			// eslint-disable-next-line no-control-regex -- intentionally detecting non-ASCII via control char boundary
 			/[^\x00-\x7F]/.test(textNode.textContent)
 		) {
 			nodes.push(textNode);
@@ -228,10 +225,19 @@ function highlightNonAsciiInReading(
 	}
 
 	nodes.forEach((node) => {
-		const wrapper = document.createElement("span");
-		let html = "";
+		const wrapper = createSpan();
 		let inHighlight = false;
 		let buffer = "";
+
+		const flushBuffer = () => {
+			if (buffer.length === 0) return;
+			if (inHighlight) {
+				wrapper.createSpan({ cls: "non-ascii-highlight", text: buffer });
+			} else {
+				wrapper.appendText(buffer);
+			}
+			buffer = "";
+		};
 
 		for (const ch of Array.from(node.textContent || "")) {
 			const code = ch.codePointAt(0);
@@ -240,28 +246,21 @@ function highlightNonAsciiInReading(
 
 			if (shouldHighlight) {
 				if (!inHighlight) {
-					html += escapeHtml(buffer);
-					buffer = "";
+					flushBuffer();
 					inHighlight = true;
 				}
 				buffer += ch;
 			} else {
 				if (inHighlight) {
-					html += `<span class="non-ascii-highlight">${escapeHtml(buffer)}</span>`;
-					buffer = "";
+					flushBuffer();
 					inHighlight = false;
 				}
 				buffer += ch;
 			}
 		}
 
-		if (inHighlight) {
-			html += `<span class="non-ascii-highlight">${escapeHtml(buffer)}</span>`;
-		} else {
-			html += escapeHtml(buffer);
-		}
+		flushBuffer();
 
-		wrapper.innerHTML = html;
 		if (node.parentNode) {
 			node.parentNode.replaceChild(wrapper, node);
 		}
@@ -284,7 +283,7 @@ class HighlightNonAsciiSettingTab extends PluginSettingTab {
 		const { containerEl } = this;
 		containerEl.empty();
 
-		new Setting(containerEl).setName("Highlight non-ASCII").setHeading();
+		;
 
 		containerEl.createEl("p", {
 			text: "Highlights any character outside the standard ASCII range (0x00-0x7F) "
@@ -309,7 +308,7 @@ class HighlightNonAsciiSettingTab extends PluginSettingTab {
 			attr: { type: "button", "aria-label": "Copy to clipboard" },
 		});
 		copyBtn.addEventListener("click", () => {
-			navigator.clipboard.writeText(snippetText);
+			void navigator.clipboard.writeText(snippetText);
 			copyBtn.textContent = "Copied!";
 			setTimeout(() => { copyBtn.textContent = "Copy"; }, 1500);
 		});
@@ -342,7 +341,7 @@ class HighlightNonAsciiSettingTab extends PluginSettingTab {
 					+ "Example: e--n",
 			)
 			.addTextArea((text) => {
-				text.setPlaceholder("e.g. e--n")
+				text.setPlaceholder("Paste allowed characters here")
 					.setValue(this.plugin.settings.allowedChars)
 					.onChange(async (value) => {
 						this.plugin.settings.allowedChars = value;
@@ -351,7 +350,7 @@ class HighlightNonAsciiSettingTab extends PluginSettingTab {
 					});
 				text.inputEl.rows = 3;
 				text.inputEl.cols = 40;
-				text.inputEl.style.fontFamily = "monospace";
+				text.inputEl.addClass("hna-monospace");
 			});
 
 		new Setting(containerEl)
@@ -371,9 +370,9 @@ class HighlightNonAsciiSettingTab extends PluginSettingTab {
 		cssTextarea.rows = 8;
 		cssTextarea.spellcheck = false;
 
-		cssTextarea.addEventListener("change", async () => {
+		cssTextarea.addEventListener("change", () => {
 			this.plugin.settings.customCSS = cssTextarea.value;
-			await this.plugin.saveSettings();
+			void this.plugin.saveSettings();
 			this.plugin.updateCustomCSS();
 		});
 	}
@@ -391,10 +390,10 @@ export default class HighlightNonAsciiPlugin extends Plugin {
 	async onload(): Promise<void> {
 		await this.loadSettings();
 
-		// Inject custom CSS override element
-		this.customStyleEl = document.createElement("style");
+		// Dynamic style element is required for user-customizable CSS at runtime
+		// eslint-disable-next-line obsidianmd/no-forbidden-elements -- dynamic user-editable CSS requires a style element
+		this.customStyleEl = document.head.createEl("style");
 		this.customStyleEl.id = "highlight-non-ascii-custom-css";
-		document.head.appendChild(this.customStyleEl);
 		this.updateCustomCSS();
 
 		// Editor extension for Edit / Live Preview
@@ -447,6 +446,7 @@ export default class HighlightNonAsciiPlugin extends Plugin {
 
 	isFileDisabledByFrontmatter(file: TFile): boolean {
 		const cache = this.app.metadataCache.getFileCache(file);
+		// eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- frontmatter values are untyped
 		const value = cache?.frontmatter?.[FRONTMATTER_KEY];
 		return value === false || value === "false";
 	}
@@ -461,13 +461,13 @@ export default class HighlightNonAsciiPlugin extends Plugin {
 		const disabled = this.isActiveFileDisabledByFrontmatter();
 		this.app.workspace.iterateAllLeaves((leaf) => {
 			const view = leaf.view as MarkdownView;
-			if (
-				view?.editor &&
-				(view.editor as any).cm instanceof EditorView
-			) {
-				(view.editor as any).cm.dispatch({
-					effects: [updateFrontmatterDisabled.of(disabled)],
-				});
+			if (view?.editor) {
+				const editorCm = (view.editor as unknown as ObsidianEditor).cm;
+				if (editorCm instanceof EditorView) {
+					editorCm.dispatch({
+						effects: [updateFrontmatterDisabled.of(disabled)],
+					});
+				}
 			}
 		});
 	}
@@ -486,10 +486,12 @@ export default class HighlightNonAsciiPlugin extends Plugin {
 	}
 
 	async loadSettings(): Promise<void> {
+		// eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- loadData returns any
+		const data = await this.loadData();
 		this.settings = Object.assign(
 			{},
 			DEFAULT_SETTINGS,
-			await this.loadData(),
+			data as Partial<HighlightNonAsciiSettings>,
 		);
 	}
 
@@ -501,24 +503,24 @@ export default class HighlightNonAsciiPlugin extends Plugin {
 		// Push effects to all open editor views
 		this.app.workspace.iterateAllLeaves((leaf) => {
 			const view = leaf.view as MarkdownView;
-			if (
-				view?.editor &&
-				(view.editor as any).cm instanceof EditorView
-			) {
-				(view.editor as any).cm.dispatch({
-					effects: [
-						toggleHighlight.of(this.settings.enabled),
-						updateAllowlist.of(this.settings.allowedChars),
-					],
-				});
+			if (view?.editor) {
+				const editorCm = (view.editor as unknown as ObsidianEditor).cm;
+				if (editorCm instanceof EditorView) {
+					editorCm.dispatch({
+						effects: [
+							toggleHighlight.of(this.settings.enabled),
+							updateAllowlist.of(this.settings.allowedChars),
+						],
+					});
+				}
 			}
 		});
 
 		// Force reading view to re-render
 		this.app.workspace.iterateAllLeaves((leaf) => {
-			const view = leaf.view as any;
-			if (view?.previewMode?.rerender) {
-				view.previewMode.rerender(true);
+			const preview = (leaf.view as unknown as ObsidianPreviewMode).previewMode;
+			if (preview?.rerender) {
+				preview.rerender(true);
 			}
 		});
 	}
