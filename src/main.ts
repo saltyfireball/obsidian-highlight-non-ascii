@@ -284,7 +284,7 @@ class HighlightNonAsciiSettingTab extends PluginSettingTab {
 		const { containerEl } = this;
 		containerEl.empty();
 
-		containerEl.createEl("h2", { text: "Highlight Non-ASCII" });
+		new Setting(containerEl).setName("Highlight non-ASCII").setHeading();
 
 		containerEl.createEl("p", {
 			text: "Highlights any character outside the standard ASCII range (0x00-0x7F) "
@@ -294,7 +294,7 @@ class HighlightNonAsciiSettingTab extends PluginSettingTab {
 		});
 
 		const frontmatterHint = containerEl.createDiv("hna-frontmatter-hint");
-		frontmatterHint.createEl("h3", { text: "Per-note control" });
+		new Setting(frontmatterHint).setName("Per-note control").setHeading();
 		frontmatterHint.createEl("p", {
 			text: "You can disable highlighting for a specific note by adding "
 				+ "the following to its frontmatter:",
