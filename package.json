@@ -1,6 +1,6 @@
 {
 	"name": "obsidian-highlight-non-ascii",
-	"version": "1.1.0",
+	"version": "1.1.1",
 	"description": "Highlights non-ASCII characters in your notes with a configurable allowlist.",
 	"main": "main.js",
 	"type": "module",
