@@ -446,8 +446,7 @@ export default class HighlightNonAsciiPlugin extends Plugin {
 
 	isFileDisabledByFrontmatter(file: TFile): boolean {
 		const cache = this.app.metadataCache.getFileCache(file);
-		// eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- frontmatter values are untyped
-		const value = cache?.frontmatter?.[FRONTMATTER_KEY];
+		const value: unknown = cache?.frontmatter?.[FRONTMATTER_KEY];
 		return value === false || value === "false";
 	}
 
@@ -486,12 +485,11 @@ export default class HighlightNonAsciiPlugin extends Plugin {
 	}
 
 	async loadSettings(): Promise<void> {
-		// eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- loadData returns any
-		const data = await this.loadData();
+		const data = (await this.loadData()) as Partial<HighlightNonAsciiSettings> | null;
 		this.settings = Object.assign(
 			{},
 			DEFAULT_SETTINGS,
-			data as Partial<HighlightNonAsciiSettings>,
+			data ?? {},
 		);
 	}
 
