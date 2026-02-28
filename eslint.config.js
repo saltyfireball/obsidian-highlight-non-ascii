@@ -22,6 +22,7 @@ export default defineConfig([
     },
     rules: {
       "obsidianmd/sample-names": "off",
+      "import/no-extraneous-dependencies": ["error", { peerDependencies: true }],
     },
   },
 ]);

@@ -7,7 +7,6 @@ import {
 	TFile,
 } from "obsidian";
 // codemirror packages are provided by Obsidian at runtime
-// eslint-disable-next-line import/no-extraneous-dependencies
 import {
 	ViewPlugin,
 	Decoration,
@@ -15,7 +14,6 @@ import {
 	EditorView,
 	ViewUpdate,
 } from "@codemirror/view";
-// eslint-disable-next-line import/no-extraneous-dependencies
 import {
 	StateField,
 	StateEffect,
@@ -217,8 +215,7 @@ function highlightNonAsciiInReading(
 		const textNode = walker.currentNode as Text;
 		if (
 			textNode.textContent &&
-			// eslint-disable-next-line no-control-regex -- intentionally detecting non-ASCII via control char boundary
-			/[^\x00-\x7F]/.test(textNode.textContent)
+			/[^\p{ASCII}]/u.test(textNode.textContent)
 		) {
 			nodes.push(textNode);
 		}
@@ -385,15 +382,14 @@ class HighlightNonAsciiSettingTab extends PluginSettingTab {
 export default class HighlightNonAsciiPlugin extends Plugin {
 	settings!: HighlightNonAsciiSettings;
 	private editorExtension!: Extension;
-	private customStyleEl: HTMLStyleElement | null = null;
+	private customStyleSheet: CSSStyleSheet | null = null;
 
 	async onload(): Promise<void> {
 		await this.loadSettings();
 
-		// Dynamic style element is required for user-customizable CSS at runtime
-		// eslint-disable-next-line obsidianmd/no-forbidden-elements -- dynamic user-editable CSS requires a style element
-		this.customStyleEl = document.head.createEl("style");
-		this.customStyleEl.id = "highlight-non-ascii-custom-css";
+		// Dynamic stylesheet for user-customizable CSS at runtime
+		this.customStyleSheet = new CSSStyleSheet();
+		document.adoptedStyleSheets = [...document.adoptedStyleSheets, this.customStyleSheet];
 		this.updateCustomCSS();
 
 		// Editor extension for Edit / Live Preview
@@ -472,15 +468,15 @@ export default class HighlightNonAsciiPlugin extends Plugin {
 	}
 
 	onunload(): void {
-		if (this.customStyleEl) {
-			this.customStyleEl.remove();
-			this.customStyleEl = null;
+		if (this.customStyleSheet) {
+			document.adoptedStyleSheets = document.adoptedStyleSheets.filter(s => s !== this.customStyleSheet);
+			this.customStyleSheet = null;
 		}
 	}
 
 	updateCustomCSS(): void {
-		if (this.customStyleEl) {
-			this.customStyleEl.textContent = this.settings.customCSS || "";
+		if (this.customStyleSheet) {
+			this.customStyleSheet.replaceSync(this.settings.customCSS || "");
 		}
 	}
 
