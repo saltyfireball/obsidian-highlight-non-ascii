@@ -13,13 +13,17 @@ Useful for catching invisible Unicode characters, accidental special characters,
 ## Features
 
 - Highlights non-ASCII characters with a visible red background
-- Works in both Edit Mode (Live Preview) and Reading View
+- Works in Edit Mode (Live Preview) with optional Reading View support
 - **Auto-replace** -- batch replace common non-ASCII characters with ASCII equivalents via the command palette
 - Configurable replacement rules with a find/replace list in settings
 - Configurable allowlist to exclude specific characters (accented letters, emojis, etc.)
 - Per-note control via frontmatter
+- **Status bar counter** -- shows the number of non-ASCII characters in the current note alongside Obsidian's word and character counts
+- **Reading view toggle** -- optionally enable highlighting in preview/reading mode (off by default)
 - Customizable highlight CSS
 - Toggle on/off from settings or the command palette
+
+    ![Example of Hightlights in action](assets/example_highlights.png)
 
 ## Usage
 
@@ -27,9 +31,12 @@ Useful for catching invisible Unicode characters, accidental special characters,
 2. Non-ASCII characters will be highlighted automatically.
 3. Use **Settings > Highlight Non-ASCII** to configure:
     - **Enable highlighting** -- toggle the feature on or off
+    - **Highlight in reading view** -- enable highlighting in preview/reading mode (off by default, since edit mode is usually sufficient)
     - **Allowed characters** -- paste characters that should NOT be highlighted (e.g. accented letters, specific emojis)
     - **Custom CSS** -- edit the highlight style directly
 4. Use the command palette: **Toggle non-ASCII highlighting** to quickly enable/disable.
+
+    ![Example of Hightlights in action](assets/example_counter.png)
 
 ## Auto-replace
 
@@ -46,16 +53,16 @@ The plugin includes a batch replacement feature for cleaning up common non-ASCII
 
 The plugin comes with these defaults out of the box:
 
-| Find | Replace | Description |
-|------|---------|-------------|
-| `'` (U+2018) | `'` | Left single curly quote |
-| `'` (U+2019) | `'` | Right single curly quote |
-| `"` (U+201C) | `"` | Left double curly quote |
-| `"` (U+201D) | `"` | Right double curly quote |
-| `--` (U+2013) | `-` | En dash |
-| `---` (U+2014) | `--` | Em dash |
-| `...` (U+2026) | `...` | Horizontal ellipsis |
-| ` ` (U+00A0) | ` ` | Non-breaking space |
+| Find           | Replace | Description              |
+| -------------- | ------- | ------------------------ |
+| `'` (U+2018)   | `'`     | Left single curly quote  |
+| `'` (U+2019)   | `'`     | Right single curly quote |
+| `"` (U+201C)   | `"`     | Left double curly quote  |
+| `"` (U+201D)   | `"`     | Right double curly quote |
+| `--` (U+2013)  | `-`     | En dash                  |
+| `---` (U+2014) | `--`    | Em dash                  |
+| `...` (U+2026) | `...`   | Horizontal ellipsis      |
+| ` ` (U+00A0)   | ` `     | Non-breaking space       |
 
 ### Customizing rules
 
@@ -67,6 +74,8 @@ You can add, edit, or remove replacement rules in **Settings > Highlight Non-ASC
 - **Remove** button to delete the rule
 
 Click **Add rule** to create a new find/replace pair.
+
+![Example of Hightlights in action](assets/example_auto_replace_rules.png)
 
 ## Disabling for specific notes
 
@@ -94,15 +103,15 @@ You can install this plugin right now using the [BRAT](https://github.com/TfTHac
 2. Open the BRAT settings
 3. Under the **Beta plugins** section, click **Add beta plugin**
 
-   ![BRAT beta plugin list](assets/brat_example_beta_plugin_list.png)
+    ![BRAT beta plugin list](assets/brat_example_beta_plugin_list.png)
 
 4. In the overlay, enter this plugin's repository: `https://github.com/saltyfireball/obsidian-highlight-non-ascii` (or just `saltyfireball/obsidian-highlight-non-ascii`)
 
-   ![BRAT add beta plugin](assets/brat_example_beta_modal.png)
+    ![BRAT add beta plugin](assets/brat_example_beta_modal.png)
 
 5. Leave the version set to latest
 
-   ![BRAT beta plugin filled](assets/brat_example_beta_modal_filled.png)
+    ![BRAT beta plugin filled](assets/brat_example_beta_modal_filled.png)
 
 6. Click **Add plugin**
 
