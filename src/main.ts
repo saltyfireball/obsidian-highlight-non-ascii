@@ -473,6 +473,7 @@ export default class HighlightNonAsciiPlugin extends Plugin {
 	settings!: HighlightNonAsciiSettings;
 	private editorExtension!: Extension;
 	private customStyleSheet: CSSStyleSheet | null = null;
+	private statusBarEl: HTMLElement | null = null;
 
 	async onload(): Promise<void> {
 		await this.loadSettings();
@@ -512,6 +513,7 @@ export default class HighlightNonAsciiPlugin extends Plugin {
 				this.settings.enabled = !this.settings.enabled;
 				await this.saveSettings();
 				this.refreshAllEditors();
+				this.updateStatusBar();
 			},
 		});
 
@@ -540,8 +542,32 @@ export default class HighlightNonAsciiPlugin extends Plugin {
 		this.registerEvent(
 			this.app.workspace.on("active-leaf-change", () => {
 				this.dispatchFrontmatterUpdate();
+				this.updateStatusBar();
 			}),
 		);
+
+		// Status bar counter
+		this.statusBarEl = this.addStatusBarItem();
+		this.statusBarEl.addClass("hna-status-bar");
+
+		// Update count when editor content changes
+		this.registerEvent(
+			this.app.workspace.on("editor-change", () => {
+				this.updateStatusBar();
+			}),
+		);
+
+		// Update on file open
+		this.registerEvent(
+			this.app.workspace.on("file-open", () => {
+				this.updateStatusBar();
+			}),
+		);
+
+		// Initial update
+		this.app.workspace.onLayoutReady(() => {
+			this.updateStatusBar();
+		});
 	}
 
 	isFileDisabledByFrontmatter(file: TFile): boolean {
@@ -581,6 +607,38 @@ export default class HighlightNonAsciiPlugin extends Plugin {
 	updateCustomCSS(): void {
 		if (this.customStyleSheet) {
 			this.customStyleSheet.replaceSync(this.settings.customCSS || "");
+		}
+	}
+
+	updateStatusBar(): void {
+		if (!this.statusBarEl) return;
+
+		if (!this.settings.enabled) {
+			this.statusBarEl.textContent = "";
+			return;
+		}
+
+		const view = this.app.workspace.getActiveViewOfType(MarkdownView);
+		if (!view) {
+			this.statusBarEl.textContent = "";
+			return;
+		}
+
+		const content = view.editor.getValue();
+		const allowedSet = buildAllowedSet(this.settings.allowedChars);
+		let count = 0;
+
+		for (const ch of Array.from(content)) {
+			const code = ch.codePointAt(0);
+			if (code !== undefined && code > 0x7f && !allowedSet.has(ch)) {
+				count++;
+			}
+		}
+
+		if (count > 0) {
+			this.statusBarEl.textContent = `${count} non-ASCII`;
+		} else {
+			this.statusBarEl.textContent = "";
 		}
 	}
 
@@ -650,6 +708,7 @@ export default class HighlightNonAsciiPlugin extends Plugin {
 			await this.app.vault.modify(file, updated);
 			const { Notice } = await import("obsidian");
 			new Notice(`Replaced ${totalReplacements} non-ASCII character(s).`);
+			this.updateStatusBar();
 		} else {
 			const { Notice } = await import("obsidian");
 			new Notice("No matching characters found to replace.");
