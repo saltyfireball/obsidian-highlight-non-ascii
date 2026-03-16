@@ -26,10 +26,16 @@ import type { ObsidianEditor, ObsidianPreviewMode } from "./global.d";
 // Settings
 // ---------------------------------------------------------------------------
 
+interface ReplacementRule {
+	from: string;
+	to: string;
+}
+
 interface HighlightNonAsciiSettings {
 	enabled: boolean;
 	allowedChars: string;
 	customCSS: string;
+	replacements: ReplacementRule[];
 }
 
 const DEFAULT_CSS =
@@ -40,10 +46,22 @@ const DEFAULT_CSS =
 	+ "  border-radius: 2px;\n"
 	+ "}";
 
+const DEFAULT_REPLACEMENTS: ReplacementRule[] = [
+	{ from: "\u2018", to: "'" },
+	{ from: "\u2019", to: "'" },
+	{ from: "\u201C", to: "\"" },
+	{ from: "\u201D", to: "\"" },
+	{ from: "\u2013", to: "-" },
+	{ from: "\u2014", to: "--" },
+	{ from: "\u2026", to: "..." },
+	{ from: "\u00A0", to: " " },
+];
+
 const DEFAULT_SETTINGS: HighlightNonAsciiSettings = {
 	enabled: true,
 	allowedChars: "",
 	customCSS: DEFAULT_CSS,
+	replacements: DEFAULT_REPLACEMENTS,
 };
 
 // ---------------------------------------------------------------------------
@@ -372,6 +390,78 @@ class HighlightNonAsciiSettingTab extends PluginSettingTab {
 			void this.plugin.saveSettings();
 			this.plugin.updateCustomCSS();
 		});
+
+		// ── Auto-replace rules ──
+		new Setting(containerEl).setName("Auto-replace rules").setHeading();
+
+		containerEl.createEl("p", {
+			text: "Define characters to find and replace when running the "
+				+ "\"Auto replace non-ASCII characters\" command from the palette. "
+				+ "Each rule replaces all occurrences of the \"find\" character with the \"replace\" text.",
+			cls: "setting-item-description",
+		});
+
+		const rulesContainer = containerEl.createDiv("hna-rules-container");
+
+		const renderRules = () => {
+			rulesContainer.empty();
+
+			this.plugin.settings.replacements.forEach((rule, index) => {
+				const row = rulesContainer.createDiv("hna-rule-row");
+
+				const fromLabel = row.createEl("span", { text: "Find:", cls: "hna-rule-label" });
+				const fromInput = row.createEl("input", { cls: "hna-rule-input hna-monospace" });
+				fromInput.type = "text";
+				fromInput.value = rule.from;
+				fromLabel.appendChild(fromInput);
+
+				const toLabel = row.createEl("span", { text: "Replace:", cls: "hna-rule-label" });
+				const toInput = row.createEl("input", { cls: "hna-rule-input hna-monospace" });
+				toInput.type = "text";
+				toInput.value = rule.to;
+				toLabel.appendChild(toInput);
+
+				const charCode = rule.from.codePointAt(0);
+				const charInfo = charCode !== undefined ? `U+${charCode.toString(16).toUpperCase().padStart(4, "0")}` : "";
+				row.createEl("span", { text: charInfo, cls: "hna-rule-charcode" });
+
+				const deleteBtn = row.createEl("button", { text: "Remove", cls: "hna-rule-delete" });
+				deleteBtn.tabIndex = -1;
+
+				fromInput.addEventListener("change", () => {
+					this.plugin.settings.replacements[index].from = fromInput.value;
+					void this.plugin.saveSettings();
+					const code = fromInput.value.codePointAt(0);
+					const info = code !== undefined ? `U+${code.toString(16).toUpperCase().padStart(4, "0")}` : "";
+					const codeSpan = row.querySelector(".hna-rule-charcode");
+					if (codeSpan) codeSpan.textContent = info;
+				});
+
+				toInput.addEventListener("change", () => {
+					this.plugin.settings.replacements[index].to = toInput.value;
+					void this.plugin.saveSettings();
+				});
+
+				deleteBtn.addEventListener("click", () => {
+					this.plugin.settings.replacements.splice(index, 1);
+					void this.plugin.saveSettings();
+					renderRules();
+				});
+			});
+		};
+
+		renderRules();
+
+		new Setting(containerEl)
+			.setName("Add replacement rule")
+			.setDesc("Add a new find/replace pair to the list.")
+			.addButton((button) =>
+				button.setButtonText("Add rule").onClick(() => {
+					this.plugin.settings.replacements.push({ from: "", to: "" });
+					void this.plugin.saveSettings();
+					renderRules();
+				}),
+			);
 	}
 }
 
@@ -422,6 +512,20 @@ export default class HighlightNonAsciiPlugin extends Plugin {
 				this.settings.enabled = !this.settings.enabled;
 				await this.saveSettings();
 				this.refreshAllEditors();
+			},
+		});
+
+		// Auto-replace command
+		this.addCommand({
+			id: "auto-replace-non-ascii",
+			name: "Auto replace non-ASCII characters",
+			checkCallback: (checking) => {
+				const file = this.app.workspace.getActiveFile();
+				if (!file || file.extension !== "md") return false;
+				if (!checking) {
+					void this.runAutoReplace(file);
+				}
+				return true;
 			},
 		});
 
@@ -517,5 +621,38 @@ export default class HighlightNonAsciiPlugin extends Plugin {
 				preview.rerender(true);
 			}
 		});
+	}
+
+	private async runAutoReplace(file: TFile): Promise<void> {
+		const rules = this.settings.replacements;
+		if (rules.length === 0) {
+			const { Notice } = await import("obsidian");
+			new Notice("No replacement rules configured.");
+			return;
+		}
+
+		const content = await this.app.vault.read(file);
+		let updated = content;
+		let totalReplacements = 0;
+
+		for (const rule of rules) {
+			if (!rule.from) continue;
+			const escaped = rule.from.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+			const regex = new RegExp(escaped, "g");
+			const matches = updated.match(regex);
+			if (matches) {
+				totalReplacements += matches.length;
+			}
+			updated = updated.replace(regex, rule.to);
+		}
+
+		if (updated !== content) {
+			await this.app.vault.modify(file, updated);
+			const { Notice } = await import("obsidian");
+			new Notice(`Replaced ${totalReplacements} non-ASCII character(s).`);
+		} else {
+			const { Notice } = await import("obsidian");
+			new Notice("No matching characters found to replace.");
+		}
 	}
 }

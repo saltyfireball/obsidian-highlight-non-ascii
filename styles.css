@@ -74,3 +74,64 @@
 	tab-size: 2;
 	resize: vertical;
 }
+
+/* Settings page -- auto-replace rules */
+
+.hna-rules-container {
+	margin-bottom: 8px;
+}
+
+.hna-rule-row {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	padding: 6px 0;
+	border-bottom: 1px solid var(--background-modifier-border);
+	flex-wrap: wrap;
+}
+
+.hna-rule-label {
+	display: flex;
+	align-items: center;
+	gap: 4px;
+	font-size: 0.85em;
+	color: var(--text-muted);
+}
+
+.hna-rule-input {
+	width: 80px;
+	padding: 4px 6px;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 4px;
+	background: var(--background-primary);
+	color: var(--text-normal);
+	font-size: 0.9em;
+}
+
+.hna-rule-input:focus {
+	border-color: var(--interactive-accent);
+	outline: none;
+}
+
+.hna-rule-charcode {
+	font-size: 0.75em;
+	color: var(--text-faint);
+	font-family: var(--font-monospace);
+	min-width: 60px;
+}
+
+.hna-rule-delete {
+	padding: 2px 8px;
+	font-size: 0.75em;
+	border-radius: 4px;
+	border: 1px solid var(--background-modifier-border);
+	background: var(--background-secondary);
+	color: var(--text-muted);
+	cursor: pointer;
+	margin-left: auto;
+}
+
+.hna-rule-delete:hover {
+	color: #FF6188;
+	border-color: #FF6188;
+}
