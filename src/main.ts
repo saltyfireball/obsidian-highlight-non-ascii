@@ -33,6 +33,7 @@ interface ReplacementRule {
 
 interface HighlightNonAsciiSettings {
 	enabled: boolean;
+	enableReadingView: boolean;
 	allowedChars: string;
 	customCSS: string;
 	replacements: ReplacementRule[];
@@ -59,6 +60,7 @@ const DEFAULT_REPLACEMENTS: ReplacementRule[] = [
 
 const DEFAULT_SETTINGS: HighlightNonAsciiSettings = {
 	enabled: true,
+	enableReadingView: false,
 	allowedChars: "",
 	customCSS: DEFAULT_CSS,
 	replacements: DEFAULT_REPLACEMENTS,
@@ -345,6 +347,23 @@ class HighlightNonAsciiSettingTab extends PluginSettingTab {
 						this.plugin.settings.enabled = value;
 						await this.plugin.saveSettings();
 						this.plugin.refreshAllEditors();
+						this.plugin.updateStatusBar();
+					}),
+			);
+
+		new Setting(containerEl)
+			.setName("Highlight in reading view")
+			.setDesc(
+				"When enabled, non-ASCII characters are also highlighted in reading/preview mode. "
+					+ "Off by default since highlighting in edit mode is usually sufficient.",
+			)
+			.addToggle((toggle) =>
+				toggle
+					.setValue(this.plugin.settings.enableReadingView)
+					.onChange(async (value) => {
+						this.plugin.settings.enableReadingView = value;
+						await this.plugin.saveSettings();
+						this.plugin.refreshAllEditors();
 					}),
 			);
 
@@ -489,7 +508,7 @@ export default class HighlightNonAsciiPlugin extends Plugin {
 
 		// Reading view post processor
 		this.registerMarkdownPostProcessor((el, ctx) => {
-			if (!this.settings.enabled) return;
+			if (!this.settings.enabled || !this.settings.enableReadingView) return;
 			if (ctx.sourcePath) {
 				const file = this.app.vault.getAbstractFileByPath(ctx.sourcePath);
 				if (file instanceof TFile && this.isFileDisabledByFrontmatter(file)) {
