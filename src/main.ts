@@ -5,6 +5,7 @@ import {
 	App,
 	MarkdownView,
 	TFile,
+	Notice,
 } from "obsidian";
 // codemirror packages are provided by Obsidian at runtime
 import {
@@ -703,7 +704,6 @@ export default class HighlightNonAsciiPlugin extends Plugin {
 	private async runAutoReplace(file: TFile): Promise<void> {
 		const rules = this.settings.replacements;
 		if (rules.length === 0) {
-			const { Notice } = await import("obsidian");
 			new Notice("No replacement rules configured.");
 			return;
 		}
@@ -725,11 +725,9 @@ export default class HighlightNonAsciiPlugin extends Plugin {
 
 		if (updated !== content) {
 			await this.app.vault.modify(file, updated);
-			const { Notice } = await import("obsidian");
 			new Notice(`Replaced ${totalReplacements} non-ASCII character(s).`);
 			this.updateStatusBar();
 		} else {
-			const { Notice } = await import("obsidian");
 			new Notice("No matching characters found to replace.");
 		}
 	}
