@@ -162,32 +162,39 @@ function buildEditorExtension(plugin: HighlightNonAsciiPlugin): Extension {
 				const builder = new RangeSetBuilder<Decoration>();
 				const doc = view.state.doc;
 
+				const isHighlightable = (ch: string): boolean => {
+					const code = ch.codePointAt(0);
+					return (
+						code !== undefined &&
+						code > 0x7f &&
+						!allowedSet.has(ch)
+					);
+				};
+
 				for (const { from, to } of view.visibleRanges) {
 					const text = doc.sliceString(from, to);
-					let i = 0;
+					// Iterate by code point index so surrogate pairs stay intact.
+					// A while-loop lets us advance past an entire run of
+					// consecutive non-ASCII chars in one step; using for-of
+					// (the previous implementation) re-visited consumed chars
+					// because the iterator advances one element at a time
+					// regardless of any manual index bookkeeping.
+					const chars = Array.from(text);
 					let pos = from;
+					let charIdx = 0;
 
-					for (const ch of Array.from(text)) {
+					while (charIdx < chars.length) {
+						const ch = chars[charIdx];
 						const charLen = ch.length;
-						const code = ch.codePointAt(0);
 
-						if (
-							code !== undefined &&
-							code > 0x7f &&
-							!allowedSet.has(ch)
-						) {
+						if (isHighlightable(ch)) {
 							let runEnd = pos + charLen;
-							const remaining = Array.from(
-								text.slice(i + charLen),
-							);
-							for (const nextCh of remaining) {
-								const nextCode = nextCh.codePointAt(0);
-								if (
-									nextCode !== undefined &&
-									nextCode > 0x7f &&
-									!allowedSet.has(nextCh)
-								) {
+							let runCount = 1;
+							for (let k = charIdx + 1; k < chars.length; k++) {
+								const nextCh = chars[k];
+								if (isHighlightable(nextCh)) {
 									runEnd += nextCh.length;
+									runCount++;
 								} else {
 									break;
 								}
@@ -199,14 +206,13 @@ function buildEditorExtension(plugin: HighlightNonAsciiPlugin): Extension {
 									class: "non-ascii-highlight",
 								}),
 							);
-							const skippedLen = runEnd - pos;
-							i += skippedLen;
 							pos = runEnd;
+							charIdx += runCount;
 							continue;
 						}
 
-						i += charLen;
 						pos += charLen;
+						charIdx += 1;
 					}
 				}
 
