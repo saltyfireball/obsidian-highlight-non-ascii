@@ -5,6 +5,20 @@
 	border-radius: 2px;
 }
 
+/* Structural defaults for the highlight pill. Kept in this stylesheet
+   (rather than the user-editable customCSS) so zero-width and very narrow
+   characters still render with a visible pill, even if the user customizes
+   colors. Override in customCSS if you really want to change them. */
+.non-ascii-highlight {
+	display: inline-block;
+	min-width: 0.5em;
+	min-height: 1em;
+	box-sizing: border-box;
+	text-align: center;
+	vertical-align: baseline;
+	line-height: 1;
+}
+
 /* Settings page -- frontmatter hint */
 
 .hna-frontmatter-hint {

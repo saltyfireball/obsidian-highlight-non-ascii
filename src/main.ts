@@ -57,6 +57,24 @@ const DEFAULT_REPLACEMENTS: ReplacementRule[] = [
 	{ from: "\u2014", to: "--" },
 	{ from: "\u2026", to: "..." },
 	{ from: "\u00A0", to: " " },
+
+	// Zero-width invisibles. ZWJ (U+200D) is intentionally NOT here because
+	// it is a legitimate joiner in emoji sequences (family emoji, etc.).
+	{ from: "\u200B", to: "" }, // ZERO WIDTH SPACE
+	{ from: "\u200C", to: "" }, // ZERO WIDTH NON-JOINER
+	{ from: "\uFEFF", to: "" }, // ZERO WIDTH NO-BREAK SPACE / BOM
+
+	// Bidirectional control codes (the "Trojan Source" attack vector).
+	// No legitimate use in plain Markdown notes; strip them.
+	{ from: "\u202A", to: "" }, // LEFT-TO-RIGHT EMBEDDING
+	{ from: "\u202B", to: "" }, // RIGHT-TO-LEFT EMBEDDING
+	{ from: "\u202C", to: "" }, // POP DIRECTIONAL FORMATTING
+	{ from: "\u202D", to: "" }, // LEFT-TO-RIGHT OVERRIDE
+	{ from: "\u202E", to: "" }, // RIGHT-TO-LEFT OVERRIDE
+	{ from: "\u2066", to: "" }, // LEFT-TO-RIGHT ISOLATE
+	{ from: "\u2067", to: "" }, // RIGHT-TO-LEFT ISOLATE
+	{ from: "\u2068", to: "" }, // FIRST STRONG ISOLATE
+	{ from: "\u2069", to: "" }, // POP DIRECTIONAL ISOLATE
 ];
 
 const DEFAULT_SETTINGS: HighlightNonAsciiSettings = {
@@ -71,9 +89,36 @@ const DEFAULT_SETTINGS: HighlightNonAsciiSettings = {
 // Helpers
 // ---------------------------------------------------------------------------
 
+/**
+ * Replace Unicode escape sequences in a user-entered string with the actual
+ * characters they reference. Lets users type code points by hand for chars
+ * that are awkward to paste (zero-width, bidi controls, etc.).
+ *
+ * Supported notations:
+ *   \uXXXX        4-digit hex (BMP code points)
+ *   \u{XXXXX}     1-6 digit hex (any code point, including astral)
+ *   U+XXXX        1-6 digit hex (any code point)
+ *
+ * Literal characters pass through unchanged, so existing rules that already
+ * contain pasted chars keep working.
+ */
+function decodeEscapes(input: string): string {
+	return input
+		.replace(/\\u\{([0-9A-Fa-f]{1,6})\}/g, (_, hex: string) =>
+			String.fromCodePoint(parseInt(hex, 16)),
+		)
+		.replace(/\\u([0-9A-Fa-f]{4})/g, (_, hex: string) =>
+			String.fromCharCode(parseInt(hex, 16)),
+		)
+		.replace(/U\+([0-9A-Fa-f]{1,6})/g, (_, hex: string) =>
+			String.fromCodePoint(parseInt(hex, 16)),
+		);
+}
+
 function buildAllowedSet(allowedChars: string): Set<string> {
 	const set = new Set<string>();
-	for (const ch of Array.from(allowedChars)) {
+	const decoded = decodeEscapes(allowedChars);
+	for (const ch of Array.from(decoded)) {
 		if (ch.trim() === "" && ch !== "\u00A0") continue;
 		set.add(ch);
 	}
@@ -427,6 +472,12 @@ class HighlightNonAsciiSettingTab extends PluginSettingTab {
 			cls: "setting-item-description",
 		});
 
+		containerEl.createEl("p", {
+			text: "Tip: paste the actual character into the field, OR enter a code point "
+				+ "as \\u202E, \\u{1F600}, or U+202E. Multiple escapes/chars in the same field are allowed.",
+			cls: "setting-item-description",
+		});
+
 		const rulesContainer = containerEl.createDiv("hna-rules-container");
 
 		const renderRules = () => {
@@ -447,8 +498,17 @@ class HighlightNonAsciiSettingTab extends PluginSettingTab {
 				toInput.value = rule.to;
 				toLabel.appendChild(toInput);
 
-				const charCode = rule.from.codePointAt(0);
-				const charInfo = charCode !== undefined ? `U+${charCode.toString(16).toUpperCase().padStart(4, "0")}` : "";
+				const formatCodePoint = (raw: string): string => {
+					const decoded = decodeEscapes(raw);
+					const chars = Array.from(decoded);
+					if (chars.length === 0) return "";
+					const first = chars[0].codePointAt(0);
+					if (first === undefined) return "";
+					const firstHex = `U+${first.toString(16).toUpperCase().padStart(4, "0")}`;
+					return chars.length > 1 ? `${firstHex} ...` : firstHex;
+				};
+
+				const charInfo = formatCodePoint(rule.from);
 				row.createEl("span", { text: charInfo, cls: "hna-rule-charcode" });
 
 				const deleteBtn = row.createEl("button", { text: "Remove", cls: "hna-rule-delete" });
@@ -457,10 +517,8 @@ class HighlightNonAsciiSettingTab extends PluginSettingTab {
 				fromInput.addEventListener("change", () => {
 					this.plugin.settings.replacements[index].from = fromInput.value;
 					void this.plugin.saveSettings();
-					const code = fromInput.value.codePointAt(0);
-					const info = code !== undefined ? `U+${code.toString(16).toUpperCase().padStart(4, "0")}` : "";
 					const codeSpan = row.querySelector(".hna-rule-charcode");
-					if (codeSpan) codeSpan.textContent = info;
+					if (codeSpan) codeSpan.textContent = formatCodePoint(fromInput.value);
 				});
 
 				toInput.addEventListener("change", () => {
@@ -719,14 +777,16 @@ export default class HighlightNonAsciiPlugin extends Plugin {
 		let totalReplacements = 0;
 
 		for (const rule of rules) {
-			if (!rule.from) continue;
-			const escaped = rule.from.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+			const fromDecoded = decodeEscapes(rule.from);
+			if (!fromDecoded) continue;
+			const toDecoded = decodeEscapes(rule.to);
+			const escaped = fromDecoded.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 			const regex = new RegExp(escaped, "g");
 			const matches = updated.match(regex);
 			if (matches) {
 				totalReplacements += matches.length;
 			}
-			updated = updated.replace(regex, rule.to);
+			updated = updated.replace(regex, toDecoded);
 		}
 
 		if (updated !== content) {
