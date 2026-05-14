@@ -281,7 +281,7 @@ function highlightNonAsciiInReading(
 	allowedSet: Set<string>,
 ): void {
 	const nodes: Text[] = [];
-	const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+	const walker = (el.ownerDocument ?? document).createTreeWalker(el, NodeFilter.SHOW_TEXT);
 
 	while (walker.nextNode()) {
 		const textNode = walker.currentNode as Text;
@@ -379,7 +379,7 @@ class HighlightNonAsciiSettingTab extends PluginSettingTab {
 		copyBtn.addEventListener("click", () => {
 			void navigator.clipboard.writeText(snippetText);
 			copyBtn.textContent = "Copied!";
-			setTimeout(() => { copyBtn.textContent = "Copy"; }, 1500);
+			activeWindow.setTimeout(() => { copyBtn.textContent = "Copy"; }, 1500);
 		});
 		frontmatterHint.createEl("p", {
 			text: "If the property is missing or set to true, highlighting "
@@ -486,13 +486,13 @@ class HighlightNonAsciiSettingTab extends PluginSettingTab {
 			this.plugin.settings.replacements.forEach((rule, index) => {
 				const row = rulesContainer.createDiv("hna-rule-row");
 
-				const fromLabel = row.createEl("span", { text: "Find:", cls: "hna-rule-label" });
+				const fromLabel = row.createSpan({ text: "Find:", cls: "hna-rule-label" });
 				const fromInput = row.createEl("input", { cls: "hna-rule-input hna-monospace" });
 				fromInput.type = "text";
 				fromInput.value = rule.from;
 				fromLabel.appendChild(fromInput);
 
-				const toLabel = row.createEl("span", { text: "Replace:", cls: "hna-rule-label" });
+				const toLabel = row.createSpan({ text: "Replace:", cls: "hna-rule-label" });
 				const toInput = row.createEl("input", { cls: "hna-rule-input hna-monospace" });
 				toInput.type = "text";
 				toInput.value = rule.to;
@@ -509,7 +509,7 @@ class HighlightNonAsciiSettingTab extends PluginSettingTab {
 				};
 
 				const charInfo = formatCodePoint(rule.from);
-				row.createEl("span", { text: charInfo, cls: "hna-rule-charcode" });
+				row.createSpan({ text: charInfo, cls: "hna-rule-charcode" });
 
 				const deleteBtn = row.createEl("button", { text: "Remove", cls: "hna-rule-delete" });
 				deleteBtn.tabIndex = -1;
