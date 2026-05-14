@@ -281,7 +281,7 @@ function highlightNonAsciiInReading(
 	allowedSet: Set<string>,
 ): void {
 	const nodes: Text[] = [];
-	const walker = (el.ownerDocument ?? document).createTreeWalker(el, NodeFilter.SHOW_TEXT);
+	const walker = (el.ownerDocument ?? activeDocument).createTreeWalker(el, NodeFilter.SHOW_TEXT);
 
 	while (walker.nextNode()) {
 		const textNode = walker.currentNode as Text;
@@ -379,7 +379,7 @@ class HighlightNonAsciiSettingTab extends PluginSettingTab {
 		copyBtn.addEventListener("click", () => {
 			void navigator.clipboard.writeText(snippetText);
 			copyBtn.textContent = "Copied!";
-			activeWindow.setTimeout(() => { copyBtn.textContent = "Copy"; }, 1500);
+			window.setTimeout(() => { copyBtn.textContent = "Copy"; }, 1500);
 		});
 		frontmatterHint.createEl("p", {
 			text: "If the property is missing or set to true, highlighting "
@@ -564,7 +564,7 @@ export default class HighlightNonAsciiPlugin extends Plugin {
 
 		// Dynamic stylesheet for user-customizable CSS at runtime
 		this.customStyleSheet = new CSSStyleSheet();
-		document.adoptedStyleSheets = [...document.adoptedStyleSheets, this.customStyleSheet];
+		activeDocument.adoptedStyleSheets = [...activeDocument.adoptedStyleSheets, this.customStyleSheet];
 		this.updateCustomCSS();
 
 		// Editor extension for Edit / Live Preview
@@ -683,7 +683,7 @@ export default class HighlightNonAsciiPlugin extends Plugin {
 
 	onunload(): void {
 		if (this.customStyleSheet) {
-			document.adoptedStyleSheets = document.adoptedStyleSheets.filter(s => s !== this.customStyleSheet);
+			activeDocument.adoptedStyleSheets = activeDocument.adoptedStyleSheets.filter(s => s !== this.customStyleSheet);
 			this.customStyleSheet = null;
 		}
 	}

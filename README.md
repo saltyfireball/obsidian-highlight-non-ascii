@@ -95,6 +95,8 @@ If the property is missing or set to `true`, highlighting remains active (as lon
 
 This plugin is available in the official Obsidian community plugin directory. Install it from **Settings > Community plugins > Browse** and search for "Highlight Non-ASCII" or "Highlight Non-ASCII by saltyfireball".
 
+Community plugin page: <https://community.obsidian.md/plugins/highlight-non-ascii>
+
 ## License
 
 MIT -- see [LICENSE](LICENSE) for details.

@@ -10,7 +10,7 @@ export default defineConfig([
       parser: tsparser,
       parserOptions: { project: "./tsconfig.json" },
       globals: {
-                window: "readonly",
+        window: "readonly",
         document: "readonly",
         setTimeout: "readonly",
         clearTimeout: "readonly",
@@ -23,9 +23,7 @@ export default defineConfig([
         createSpan: "readonly",
         createEl: "readonly",
         createFragment: "readonly",
-        navigator: "readonly",
         NodeFilter: "readonly",
-        createSpan: "readonly",
       },
     },
     rules: {

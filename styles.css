@@ -1,15 +1,12 @@
+/* Structural defaults (display/min-width/etc.) are kept in this stylesheet
+   rather than the user-editable customCSS so zero-width and very narrow
+   characters still render with a visible pill even if the user customizes
+   colors. Override in customCSS if you really want to change them. */
 .non-ascii-highlight {
 	background-color: rgba(255, 60, 60, 1);
 	padding: 1px;
 	border: 1px solid rgb(255, 255, 255);
 	border-radius: 2px;
-}
-
-/* Structural defaults for the highlight pill. Kept in this stylesheet
-   (rather than the user-editable customCSS) so zero-width and very narrow
-   characters still render with a visible pill, even if the user customizes
-   colors. Override in customCSS if you really want to change them. */
-.non-ascii-highlight {
 	display: inline-block;
 	min-width: 0.5em;
 	min-height: 1em;
