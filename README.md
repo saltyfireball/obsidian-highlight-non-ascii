@@ -97,6 +97,10 @@ This plugin is available in the official Obsidian community plugin directory. In
 
 Community plugin page: <https://community.obsidian.md/plugins/highlight-non-ascii>
 
+## More Plugins by saltyfireball
+
+Browse all of my published Obsidian plugins on my profile: <https://community.obsidian.md/users/saltyfireball>
+
 ## License
 
 MIT -- see [LICENSE](LICENSE) for details.
